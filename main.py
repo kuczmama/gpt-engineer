@@ -3,6 +3,8 @@ import os
 import subprocess
 import re
 import sys
+import webbrowser
+from http.server import SimpleHTTPRequestHandler, HTTPServer
 
 openai.api_key = os.environ['OPENAI_API_KEY']
 
@@ -12,6 +14,22 @@ MODEL = "gpt-4"
 # Ensure the output directory exists
 if not os.path.exists(OUTPUT_DIRECTORY):
     os.makedirs(OUTPUT_DIRECTORY)
+
+def run_web_server():
+    # Change to the directory where the files are saved
+    os.chdir(OUTPUT_DIRECTORY)
+    
+    # Start a simple HTTP server on port 8000
+    handler = SimpleHTTPRequestHandler
+    httpd = HTTPServer(("localhost", 8000), handler)
+    
+    # Open the browser to view the webpage
+    webbrowser.open("http://localhost:8000")
+    
+    # Note: This will block indefinitely until manually killed
+    # Ideally, you'd have a more controlled way to run and stop this
+    print("HTTP server started on port 8000. Press Ctrl+C to stop.")
+    httpd.serve_forever()
 
 def get_response(messages):
     response = openai.ChatCompletion.create(
@@ -119,6 +137,20 @@ def main():
                     write_to_file(filename, code)
                     print(f"\n[File Created] {os.path.join(OUTPUT_DIRECTORY, filename)}")
 
+            run_choice = input("\nDo you want to run the web files? (yes/no): ").lower()
+            if run_choice == 'yes':
+                run_web_server()
+            
+            # 3. Ask about any problems or bugs
+            modify_choice = input("\nDid you encounter any problems or bugs? (yes/no): ").lower()
+
+            # 4. Decide next steps
+            if modify_choice == 'yes':
+                # Loop back to the development phase
+                continue
+            else:
+                print("\nThanks for using the program!")
+                break
 
         except Exception as e:
             print(f"\n[ERROR] {str(e)}")
