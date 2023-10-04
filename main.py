@@ -4,31 +4,25 @@ import subprocess
 import re
 import sys
 import webbrowser
+import threading
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 
 openai.api_key = os.environ['OPENAI_API_KEY']
 
 OUTPUT_DIRECTORY = "ai_generated_files"
-MODEL = "gpt-4"
+MODEL = "gpt-3.5-turbo"
 
 # Ensure the output directory exists
 if not os.path.exists(OUTPUT_DIRECTORY):
     os.makedirs(OUTPUT_DIRECTORY)
 
 def run_web_server():
-    # Change to the directory where the files are saved
     os.chdir(OUTPUT_DIRECTORY)
-    
-    # Start a simple HTTP server on port 8000
+
     handler = SimpleHTTPRequestHandler
     httpd = HTTPServer(("localhost", 8000), handler)
-    
-    # Open the browser to view the webpage
-    webbrowser.open("http://localhost:8000")
-    
-    # Note: This will block indefinitely until manually killed
-    # Ideally, you'd have a more controlled way to run and stop this
-    print("HTTP server started on port 8000. Press Ctrl+C to stop.")
+
+    print("HTTP server started on port 8000.")
     httpd.serve_forever()
 
 def get_response(messages):
@@ -41,10 +35,39 @@ def get_response(messages):
     print(f"\n[DEBUG - Assistant's Response]\n{content}\n[DEBUG END]\n")
     return content
 
-def write_to_file(filename, content):
-    filepath = os.path.join(OUTPUT_DIRECTORY, filename)
+def sanitize_folder_name(name):
+    """
+    Transform the user's prompt into a valid folder name.
+    """
+    # Keep only alphanumeric characters and spaces
+    sanitized_name = re.sub(r'[^a-zA-Z0-9 ]', '', name)
+    # Replace spaces with underscores and lowercase everything
+    sanitized_name = sanitized_name.replace(' ', '_').lower()
+    # Limit the folder name's length to 50 characters
+    return sanitized_name[:50]
+
+def create_unique_folder(base_name):
+    """
+    Create a unique folder based on the base name.
+    If the folder already exists, append a number to make it unique.
+    """
+    counter = 1
+    folder_name = base_name
+    while os.path.exists(os.path.join(OUTPUT_DIRECTORY, folder_name)):
+        folder_name = f"{base_name}_{counter}"
+        counter += 1
+    os.makedirs(os.path.join(OUTPUT_DIRECTORY, folder_name))
+    return folder_name
+
+def write_to_file(folder_name, filename, content):
+    """
+    Modified write_to_file function to include the folder_name.
+    """
+    filepath = os.path.join(OUTPUT_DIRECTORY, folder_name, filename)
     with open(filepath, 'w') as f:
         f.write(content)
+    print(f"[File Created] {os.path.join(OUTPUT_DIRECTORY, folder_name, filename)}")
+
 
 def execute_test_script(test_file):
     try:
@@ -83,17 +106,44 @@ def extract_multiple_files(content):
     return list(zip(filenames, file_contents))
 
 def extract_filename_and_code(response_content):
-    pattern = r'\[filename\](.*?)\[\/filename\]\s*```\w+\s*(.*?)```'
-
-    matches = re.findall(pattern, response_content, re.DOTALL)
+    # Regex patterns
+    filename_pattern = r'\[filename\](?P<filename1>.*?)\[/filename\]\s*|\[(?P<filename2>[a-zA-Z0-9_\-]+\.(?:html|css|js)?)\]\s*'
+    code_pattern = r'```(?:\w*\s*)?(.*?)```'  # updated regex pattern for code block
 
     filenames_and_codes = []
-    for match in matches:
-        filename = match[0].strip()
-        code = match[1].strip('`').strip()
+
+    while True:
+        # Search for filename
+        filename_match = re.search(filename_pattern, response_content)
+
+        # If filename isn't found, break out of the loop
+        if not filename_match:
+            break
+
+        # Get the filename. Use the appropriate named group based on which pattern matched
+        filename = filename_match.group('filename1') or filename_match.group('filename2')
+        # Remove the matched filename from the content to continue the search later
+        response_content = response_content.replace(filename_match.group(0), '', 1)
+
+        # Search for the code block
+        code_match = re.search(code_pattern, response_content, re.DOTALL)  # Added re.DOTALL for multi-line matching
+
+        # If code isn't found after a filename, abort the program
+        if not code_match:
+            raise Exception("Code not found after filename in response. Aborting program.")
+
+        # Remove the matched code from the content
+        response_content = response_content.replace(code_match.group(0), '', 1)
+        code = code_match.group(1).strip()
+
         filenames_and_codes.append((filename, code))
-    
+
+    # If no filename and code pairs are found, abort the program
+    if not filenames_and_codes:
+        raise Exception("No filename and code pairs found in response. Aborting program.")
+
     return filenames_and_codes
+
 
 
 def developer_create_code(original_task, functional_requirement, previous_messages):
@@ -114,6 +164,9 @@ def qa_create_test(task, previous_messages):
 def main():
     while True:
         user_input = input("\nWhat web app feature do you want to create? ")
+        # Create a unique folder for this session based on user input
+        base_folder_name = sanitize_folder_name(user_input)
+        current_folder_name = create_unique_folder(base_folder_name)
 
         try:
             # Generate subtasks using the PM
@@ -134,12 +187,20 @@ def main():
                 
                 filenames_and_codes = developer_create_code(user_input, task, initial_dev_messages)
                 for filename, code in filenames_and_codes:
-                    write_to_file(filename, code)
+                    write_to_file(current_folder_name, filename, code)
                     print(f"\n[File Created] {os.path.join(OUTPUT_DIRECTORY, filename)}")
 
             run_choice = input("\nDo you want to run the web files? (yes/no): ").lower()
             if run_choice == 'yes':
-                run_web_server()
+                # Start the server in a separate thread
+                web_server_thread = threading.Thread(target=run_web_server)
+                web_server_thread.start()
+
+                # A way to pause the main thread and let the user test the web app.
+                # You can press Enter to stop the server and continue the main program.
+                input("\nPress Enter when you're done testing the web app.")
+                # Stopping the server (this method is a bit abrupt, ideally you would have a more graceful way)
+                os._exit(0)
             
             # 3. Ask about any problems or bugs
             modify_choice = input("\nDid you encounter any problems or bugs? (yes/no): ").lower()
