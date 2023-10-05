@@ -16,6 +16,8 @@ TEST_SUBDIRECTORY = "tests"
 CODE_FILES = set()
 MODEL = "gpt-3.5-turbo"
 # MODEL = 'gpt-4'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 CACHE_FILE = "response_cache.json"
 
@@ -217,16 +219,19 @@ def qa_create_test(task, previous_messages):
     # Format the information about the code files and their content by reading from the disk
     file_data_info = ""
     for filepath in CODE_FILES:
-        with open(filepath, 'r') as f:
+        # Construct the full path using the base directory and the relative file path
+        full_filepath = os.path.join(BASE_DIR, filepath)
+        with open(full_filepath, 'r') as f:
             content = f.read()
         file_data_info += f"File: {os.path.basename(filepath)}\nContent:\n{content}\n\n"
 
     qa_messages = previous_messages + [
-        {"role": "user", "content": f"As a QA, provide a Selenium testing script (in Python).  Start your response with a filename suggestion enclosed in filename markers like [filename.py], followed by code in code markers like: ```python code_here```.  Ensure each code block has a file marker, and your response doesn't contain any other filename markers. You need to write the est for for '{task}'. Here are the code files and their content:\n\n{file_data_info}"}
+        {"role": "user", "content": f"As a QA, provide a Selenium testing script (in Python). Ensure each code block has a file marker, and your response doesn't contain any other filename markers. You need to write the test for '{task}'. Here are the code files and their content:\n\n{file_data_info}"}
     ]
     
     response = get_response(qa_messages)
     return extract_filename_and_code(response)
+
 
 def main():
     while True:
