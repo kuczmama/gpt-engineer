@@ -1,29 +1,20 @@
 import openai
 import os
-import subprocess
 import re
-import sys
-import webbrowser
-import threading
 import json
-from http.server import SimpleHTTPRequestHandler, HTTPServer
+import prompts
+import file_utils
+from os import walk
 
 openai.api_key = os.environ['OPENAI_API_KEY']
-
-OUTPUT_DIRECTORY = "ai_generated_files"
-CODE_SUBDIRECTORY = "code"
-TEST_SUBDIRECTORY = "tests"
-CODE_FILES = set()
-MODEL = "gpt-3.5-turbo"
-# MODEL = 'gpt-4'
+MODEL = "gpt-3.5-turbo-16k"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-
 CACHE_FILE = "response_cache.json"
+MAX_ITERATIONS = 1
 
 # Ensure the output directory exists
-if not os.path.exists(OUTPUT_DIRECTORY):
-    os.makedirs(OUTPUT_DIRECTORY)
+if not os.path.exists(file_utils.OUTPUT_DIRECTORY):
+    os.makedirs(file_utils.OUTPUT_DIRECTORY)
 
 def load_cache():
     """Load cached data from the JSON file. If no file exists, return an empty dictionary."""
@@ -32,22 +23,11 @@ def load_cache():
             return json.load(f)
     else:
         return {}
-
+    
 def save_cache(cache_data):
     """Save data to the cache JSON file."""
     with open(CACHE_FILE, 'w') as f:
         json.dump(cache_data, f, indent=4)
-
-
-
-def run_web_server():
-    os.chdir(OUTPUT_DIRECTORY)
-
-    handler = SimpleHTTPRequestHandler
-    httpd = HTTPServer(("localhost", 8000), handler)
-
-    print("HTTP server started on port 8000.")
-    httpd.serve_forever()
 
 def get_response(messages):
     cache_data = load_cache()
@@ -74,95 +54,8 @@ def get_response(messages):
     
     return content
 
-def sanitize_folder_name(name):
-    """
-    Transform the user's prompt into a valid folder name.
-    """
-    # Keep only alphanumeric characters and spaces
-    sanitized_name = re.sub(r'[^a-zA-Z0-9 ]', '', name)
-    # Replace spaces with underscores and lowercase everything
-    sanitized_name = sanitized_name.replace(' ', '_').lower()
-    # Limit the folder name's length to 50 characters
-    return sanitized_name[:50]
-
-def create_unique_folder(base_name):
-    """
-    Create a unique folder based on the base name.
-    If the folder already exists, append a number to make it unique.
-    """
-    counter = 1
-    folder_name = base_name
-    while os.path.exists(os.path.join(OUTPUT_DIRECTORY, folder_name)):
-        folder_name = f"{base_name}_{counter}"
-        counter += 1
-    os.makedirs(os.path.join(OUTPUT_DIRECTORY, folder_name))
-    return folder_name
-
-def write_to_file(folder_name, subdirectory, filename, content):
-    """
-    Save file to the specified subdirectory.
-    """
-    filepath = os.path.join(OUTPUT_DIRECTORY, folder_name, subdirectory, filename)
-    with open(filepath, 'w') as f:
-        f.write(content)
-    print(f"[File Created] {filepath}")
-    if subdirectory == CODE_SUBDIRECTORY:  # Only add to the set if it's a code file and if it's not already in the set
-        CODE_FILES.add(filepath)
-
-def execute_test_script(test_file):
-    try:
-        feedback = subprocess.run(["python", os.path.join(OUTPUT_DIRECTORY, test_file)], capture_output=True, text=True)
-        return feedback.stdout
-    except subprocess.CalledProcessError as cpe:
-        return f"Error during execution: {cpe.output}"
-    except Exception as e:
-        return f"Error: {e}"
-
-
-def pm_breakdown_feature(user_input):
-    pm_messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": f"Provide a list of functional requirements for a '{user_input}' into a detailed comma-separated list."}
-    ]
-    response = get_response(pm_messages)
-    requirements = [req.strip() for req in response.split(",")]
-    return requirements
-
-def extract_code(content):
-    # Return lines that look like code (e.g., don't contain commentary or markdown)
-    return "\n".join([line for line in content.splitlines() if not line.startswith("```")])
-
-def extract_multiple_files(content):
-    # Find all occurrences of filename markers
-    filenames = re.findall(r'\[filename\](.*?)\[/filename\]', content)
-    
-    # Split content based on the filename markers to extract file content
-    file_contents = re.split(r'\[filename\].*?\[/filename\]', content)[1:]  # Ignoring the part before the first filename
-    
-    # Removing any extra whitespaces or newlines from both filenames and file contents
-    filenames = [f.strip() for f in filenames]
-    file_contents = [extract_code(c) for c in file_contents]
-    
-    return list(zip(filenames, file_contents))
-
-def run_test_script(task, folder_name):
-    """
-    Create a test script for the task and run it.
-    """
-    test_files = qa_create_test(task, [])
-    for filename, code in test_files:
-        write_to_file(folder_name, TEST_SUBDIRECTORY, filename, code)
-        print(f"\n[Testing File Created] {os.path.join(OUTPUT_DIRECTORY, TEST_SUBDIRECTORY, filename)}")
-
-    # Move to the tests directory before executing tests
-    os.chdir(os.path.join(OUTPUT_DIRECTORY, folder_name, TEST_SUBDIRECTORY))
-
-    # Assuming the test files are Python scripts, execute them
-    for filename, _ in test_files:
-        feedback = execute_test_script(filename)
-        print(feedback)
-
 def extract_filename_and_code(response_content):
+    print(f"Extract_filename_and_code")
     # Regex pattern
     filename_pattern = r'\[(?P<filename>[a-zA-Z0-9_\-]+\.(?:html|css|js|py|java|cpp|go|rs|php|swift))\]'
     code_pattern = r'```(?:\w*\s*)?(.*?)```'
@@ -175,6 +68,7 @@ def extract_filename_and_code(response_content):
 
         # If filename isn't found, break out of the loop
         if not filename_match:
+            print(f"No filename found in response. {response_content}")
             break
 
         # Get the position where the filename match ends
@@ -185,6 +79,9 @@ def extract_filename_and_code(response_content):
 
         # If code isn't found after a filename, abort the program
         if not code_match:
+            if len(filenames_and_codes) > 0:
+                print(f"Code not found after filename in response. Returning {len(filenames_and_codes)} filenames and codes.")
+                return filenames_and_codes
             raise Exception("Code not found after filename in response. Aborting program.")
 
         # Get the filename from the matched group
@@ -204,78 +101,104 @@ def extract_filename_and_code(response_content):
 
     return filenames_and_codes
 
-
-
-# TODO, prompt developer using files they have already written so they can re-use them
-def developer_create_code(original_task, functional_requirement, previous_messages):
-    dev_messages = previous_messages + [
-        {"role": "user", "content": f"You are a software developer working on a '{original_task}', Please write the html/css/javascript/etc code for '{functional_requirement}'. Start your response with a filename suggestion enclosed in filename markers like [filename.js], followed by code in code markers like: ```python code_here```.  Ensure each code block has a file marker, and your response doesn't contain any other filename markers."}
-    ]   
-    response = get_response(dev_messages)
-    return extract_filename_and_code(response)
-
-
-def qa_create_test(task, previous_messages):
-    # Format the information about the code files and their content by reading from the disk
-    file_data_info = ""
-    for filepath in CODE_FILES:
-        # Construct the full path using the base directory and the relative file path
-        full_filepath = os.path.join(BASE_DIR, filepath)
-        with open(full_filepath, 'r') as f:
-            content = f.read()
-        file_data_info += f"File: {os.path.basename(filepath)}\nContent:\n{content}\n\n"
-
-    qa_messages = previous_messages + [
-        {"role": "user", "content": f"As a QA, provide a Selenium testing script (in Python). Ensure each code block has a file marker, and your response doesn't contain any other filename markers. You need to write the test for '{task}'. Here are the code files and their content:\n\n{file_data_info}"}
+def prompt(content):
+    messages = [
+        {"role": "system", "content": prompts.PREAMBLE},
+        {"role": "user", "content": content}
     ]
-    
-    response = get_response(qa_messages)
+    return get_response(messages)
+
+def pm_breakdown_feature(user_input):
+    content = prompts.pm_feature_list(user_input, "Product Manager")
+    response = prompt(content)
+    requirements = [req.strip() for req in response.split("\n")]
+    return requirements
+
+def developer_initialize(user_input):
+    content = prompts.developer_initialize(user_input, "Developer")
+    response = prompt(content)
     return extract_filename_and_code(response)
 
+def developer_handle_subtask(user_input, subtask, original_code):
+    content = prompts.developer_feature_work(user_input, "Developer", subtask, original_code)
+    response = prompt(content)
+    return extract_filename_and_code(response)
+
+def get_code_review(user_input, subtask, original_code):
+    content = prompts.code_reviewer(user_input, "Code Reviewer", subtask, original_code)
+    response = prompt(content)
+    return response
+
+def developer_fix_code_review(user_input, feature, comments, original_code):
+    content = prompts.developer_fix_code_review(user_input, "Developer", feature, comments, original_code)
+    response = prompt(content)
+    return extract_filename_and_code(response)
+
+def get_current_code_str(current_folder_name):
+    base_path = file_utils.get_code_directory(current_folder_name)
+    print(f"get_current_code: {base_path}")
+    response = ""
+    f = []
+    for (dirpath, dirnames, filenames) in walk(base_path):
+        f.extend(filenames)
+
+    print("filenames: ", f)
+    for filename in f:
+        file_path = os.path.join(base_path, filename)
+        print("path: ", file_path)
+        open(file_path, 'r').read()
+        response += f"[{filename}]\n"
+        response += f"```{filename.split('.')[-1]}\n{open(file_path, 'r').read()}\n```"
+        response += "\n\n"
+
+    return response
+
+def write_filenames_and_code(current_folder_name, filenames_and_codes):
+    for filename, code in filenames_and_codes:
+        file_utils.write_to_file(current_folder_name, file_utils.CODE_SUBDIRECTORY, filename, code)
+        print(f"\n[File Created] {os.path.join(file_utils.OUTPUT_DIRECTORY, file_utils.CODE_SUBDIRECTORY, filename)}")
 
 def main():
-    while True:
-        user_input = input("\nWhat web app feature do you want to create? ")
-        # Create a unique folder for this session based on user input
-        base_folder_name = sanitize_folder_name(user_input)
-        current_folder_name = create_unique_folder(base_folder_name)
+    user_input = input("\nWhat web app feature do you want to create? ")
+    # Create a unique folder for this session based on user input
+    project_folder_name = file_utils.sanitize_folder_name(user_input)
+    current_folder_name = file_utils.create_unique_folder(project_folder_name)
 
-        # Create code and tests subdirectories for the current folder
-        os.makedirs(os.path.join(OUTPUT_DIRECTORY, current_folder_name, CODE_SUBDIRECTORY))
-        os.makedirs(os.path.join(OUTPUT_DIRECTORY, current_folder_name, TEST_SUBDIRECTORY))
+    # # # Create code and tests subdirectories for the current folder
+    os.makedirs(os.path.join(file_utils.OUTPUT_DIRECTORY, current_folder_name, file_utils.CODE_SUBDIRECTORY))
+    
+    for i in range(MAX_ITERATIONS):
+        print(f"\n[Iteration {i + 1}]")
+        print("[Debug] Generating subtasks for PM")
+        subtasks = pm_breakdown_feature(user_input)
+        print(f"PM Generated ({len(subtasks)} subtasks)")
+        if not subtasks:
+            print("Unable to generate subtasks. Try again.")
+            continue
 
-        try:
-            # Generate subtasks using the PM
-            subtasks = pm_breakdown_feature(user_input)
-            
-            if not subtasks:
-                print("Unable to generate subtasks. Try again.")
-                continue
-            
-            # Define an initial context for the developer
-            initial_dev_messages = [
-                {"role": "system", "content": "You are a skilled software developer."},
-                {"role": "user", "content": f"You are tasked with building a '{user_input}'. Please provide code for the feature."}
-            ]
-            
-            for index, task in enumerate(subtasks):
-                print(f"\n[Subtask {index + 1}] {task}")
+        filenames_and_codes = developer_initialize(user_input)
+        write_filenames_and_code(current_folder_name, filenames_and_codes)
 
-                filenames_and_codes = developer_create_code(user_input, task, initial_dev_messages)
-                for filename, code in filenames_and_codes:
-                    write_to_file(current_folder_name, CODE_SUBDIRECTORY, filename, code)
-                    print(f"\n[File Created] {os.path.join(OUTPUT_DIRECTORY, CODE_SUBDIRECTORY, filename)}")
-
-                # Run tests
-                test_choice = input("\nDo you want to run tests for this code? (yes/no): ").lower()
-                if test_choice == 'yes':
-                    web_server_thread = threading.Thread(target=run_web_server)
-                    web_server_thread.start()
-                    run_test_script(task, current_folder_name)
-
-        except Exception as e:
-            print(f"\n[ERROR] {str(e)}")
-            sys.exit(1)  # Exit the program with an error code of 1
+        print("Current Code:")
+        print(get_current_code_str(current_folder_name))
+        
+        for subtask in subtasks:
+            print(f"Handling subtask: {subtask}")
+            # Update the current code based on the subtask
+            filenames_and_codes = developer_handle_subtask(
+                user_input,
+                subtask,
+                get_current_code_str(current_folder_name))
+            write_filenames_and_code(current_folder_name, filenames_and_codes)
+            print("Doing code review")
+            comments = get_code_review(user_input, subtask, get_current_code_str(current_folder_name))
+            print("Fixing code")
+            filenames_and_codes = developer_fix_code_review(
+                user_input,
+                subtask,
+                comments,
+                get_current_code_str(current_folder_name))
+            write_filenames_and_code(current_folder_name, filenames_and_codes)
 
 if __name__ == '__main__':
     try:
