@@ -43,7 +43,7 @@ pip install openai
 Fire up your terminal and say the magic spell:
 
 ```bash
-python <script_name>.py --task "Your whimsical software wish" --name "Fancy name for your software"
+python main.py --task "A snake game" --name "Retro Snake"
 ```
 
 markdown

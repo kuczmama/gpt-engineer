@@ -180,9 +180,15 @@ def write_filenames_and_code(current_folder_name, filenames_and_codes):
 
 
 def main():
-    user_input = input("\nWhat web app feature do you want to create? ")
+    user_input = args.task
+    project_name = args.name
+    # Fallback to asking the user what they want to do, if they don't se the command line arguments
+    if (not user_input) or (not project_name):
+        user_input = input("\nWhat web app feature do you want to create? ")
+        project_name = user_input
+    
     # Create a unique folder for this session based on user input
-    project_folder_name = file_utils.sanitize_folder_name(user_input)
+    project_folder_name = file_utils.sanitize_folder_name(project_name)
     current_folder_name = file_utils.create_unique_folder(project_folder_name)
 
     # # # Create code and tests subdirectories for the current folder
