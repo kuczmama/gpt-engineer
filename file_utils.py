@@ -1,6 +1,6 @@
 import os
 
-OUTPUT_DIRECTORY = "ai_generated_files3"
+OUTPUT_DIRECTORY = "ai_generated_files"
 CODE_SUBDIRECTORY = "code"
 TEST_SUBDIRECTORY = "tests"
 CODE_FILES = set()
