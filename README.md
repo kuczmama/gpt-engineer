@@ -1,5 +1,7 @@
 # 🚀 DevTeam Simulation using ChatGPT
 
+![Logo](res/logo.jpeg)
+
 ## 🎯 Overview
 
 Ever thought software development was just about typing away at keyboards? Think again! This project is where the magic of ChatGPT meets the intricacies of a software development team. Consisting of roles like:
@@ -10,6 +12,9 @@ Ever thought software development was just about typing away at keyboards? Think
 - 🤔 Human Feedback - Because humans are... unpredictable.
 
 Using OpenAI's ChatGPT, we don't just generate code; we craft masterpieces... iteratively, of course!
+
+# Demo
+🎥 Demo: Dive into the interactive experience and witness the magic of "GPT Engineer" in action. Prepare to be amazed! ✨
 
 ## ✨ Features
 
