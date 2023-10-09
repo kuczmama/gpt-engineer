@@ -5,12 +5,32 @@ import json
 import prompts
 import file_utils
 from os import walk
+import argparse
+import webbrowser
 
 openai.api_key = os.environ['OPENAI_API_KEY']
-MODEL = "gpt-3.5-turbo-16k"
+DEFAULT_MODEL = "gpt-3.5-turbo-16k"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_FILE = "response_cache.json"
 MAX_ITERATIONS = 1
+
+parser = argparse.ArgumentParser(description='argparse')
+parser.add_argument('--task', type=str, default=None,
+                    help="Prompt of software")
+parser.add_argument('--name', type=str, default=None,
+                    help="Name of software, your software will be generated in {fileutils.OUTPUT_DIRECTORY}")
+parser.add_argument('--model', type=str, default=DEFAULT_MODEL,
+                    help="GPT Model, choose from {'gpt-3.5-turbo-16k','gpt-4','gpt-3.5-turbo'}")
+parser.add_argument('-dhi', '--disable-human-input', help="Enable human input", action='store_true')
+
+args = parser.parse_args()
+# print (f"Args: {args}")
+
+MODEL = args.model
+print("Using model: " + MODEL)
+print("Task: ", args.task)
+print("Name: ", args.name)
+print("Disable Human input: ", args.disable_human_input)
 
 # Ensure the output directory exists
 if not os.path.exists(file_utils.OUTPUT_DIRECTORY):
@@ -145,7 +165,6 @@ def get_current_code_str(current_folder_name):
     print("filenames: ", f)
     for filename in f:
         file_path = os.path.join(base_path, filename)
-        print("path: ", file_path)
         open(file_path, 'r').read()
         response += f"[{filename}]\n"
         response += f"```{filename.split('.')[-1]}\n{open(file_path, 'r').read()}\n```"
@@ -156,7 +175,9 @@ def get_current_code_str(current_folder_name):
 def write_filenames_and_code(current_folder_name, filenames_and_codes):
     for filename, code in filenames_and_codes:
         file_utils.write_to_file(current_folder_name, file_utils.CODE_SUBDIRECTORY, filename, code)
-        print(f"\n[File Created] {os.path.join(file_utils.OUTPUT_DIRECTORY, file_utils.CODE_SUBDIRECTORY, filename)}")
+    # Open a browser
+    webbrowser.open(f"file://{os.path.realpath(file_utils.get_code_directory(current_folder_name))}/index.html",new=2)
+
 
 def main():
     user_input = input("\nWhat web app feature do you want to create? ")
@@ -191,14 +212,26 @@ def main():
                 get_current_code_str(current_folder_name))
             write_filenames_and_code(current_folder_name, filenames_and_codes)
             print("Doing code review")
-            comments = get_code_review(user_input, subtask, get_current_code_str(current_folder_name))
-            print("Fixing code")
+            ai_comments = get_code_review(user_input, subtask, get_current_code_str(current_folder_name))
+
+            print("Fixing code from AI comments")
             filenames_and_codes = developer_fix_code_review(
                 user_input,
                 subtask,
-                comments,
+                ai_comments,
                 get_current_code_str(current_folder_name))
             write_filenames_and_code(current_folder_name, filenames_and_codes)
+            
+            if not args.disable_human_input:
+                print(f"Code can be found at {os.path.abspath(file_utils.get_code_directory(current_folder_name))}")
+                # Open webbrowser with the code running
+                user_comments = input("\nWhat feedback do you want to give? ")
+                filenames_and_codes = developer_fix_code_review(
+                    user_input,
+                    subtask,
+                    user_comments,
+                    get_current_code_str(current_folder_name))
+                write_filenames_and_code(current_folder_name, filenames_and_codes)
 
 if __name__ == '__main__':
     try:

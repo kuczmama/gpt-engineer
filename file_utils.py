@@ -37,7 +37,7 @@ def write_to_file(project_folder_name, subdirectory, filename, content):
     filepath = os.path.join(OUTPUT_DIRECTORY, project_folder_name, subdirectory, filename)
     with open(filepath, 'w') as f:
         f.write(content)
-    print(f"[File Created] {filepath}")
+    print(f"[File Created] {os.path.abspath(filepath)}")
     if subdirectory == CODE_SUBDIRECTORY:  # Only add to the set if it's a code file and if it's not already in the set
         CODE_FILES.add(filepath)
 
