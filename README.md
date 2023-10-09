@@ -16,6 +16,9 @@ Using OpenAI's ChatGPT, we don't just generate code; we craft masterpieces... it
 # Demo
 🎥 Demo: Dive into the interactive experience and witness the magic of "GPT Engineer" in action. Prepare to be amazed! ✨
 
+[![Watch the video](res/video-thumbnail.png)](https://youtu.be/gpQ95e6maEs)
+
+
 ## ✨ Features
 
 - 💬 Uses OpenAI GPT models as our resident brainiac.
