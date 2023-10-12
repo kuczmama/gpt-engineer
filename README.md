@@ -1,6 +1,6 @@
 # 🚀 DevTeam Simulation using ChatGPT
 
-![Logo](res/logo.jpeg)
+![Logo](res/logo2.jpeg)
 
 ## 🎯 Overview
 
@@ -33,6 +33,14 @@ Using OpenAI's ChatGPT, we don't just generate code; we craft masterpieces... it
 
 - 🤖 OpenAI Python library.
 - 🔧 Python's toolkit: os, re, json, argparse, webbrowser.
+
+## How it works
+
+This works by having a user, start with a prompt to the "Project Manager" agent.  The Project Manager, goes and creates tasks for the developer.  The developer then creates code, which is reviewed by the code reviewer.  On every iteration, this code is saved to a file which can be viewed in the browser.
+
+![Arch](res/gpt-agents-arch.drawio.png)
+
+
 
 ## 🏗 Setup
 
