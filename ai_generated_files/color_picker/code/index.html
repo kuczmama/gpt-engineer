@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>HTML Color Picker</title>
+  <link rel="stylesheet" type="text/css" href="styles.css">
+  <script type="text/javascript" src="script.js"></script>
+  <script>
+    function updateColor(color) {
+      var displayColor = document.getElementById("display-color");
+      displayColor.style.backgroundColor = color;
+      displayColor.textContent = "Color: " + color;
+
+      // Save picked color to local storage
+      var storedColors = JSON.parse(localStorage.getItem("pickedColors")) || [];
+      if (!storedColors.includes(color)) {
+        storedColors.push(color);
+        localStorage.setItem("pickedColors", JSON.stringify(storedColors));
+
+        // Add the picked color to the color options grid
+        addColorOption(color);
+      }
+    }
+
+    function copyColor() {
+      var color = document.getElementById("display-color").textContent.trim().replace("Color: ", "");
+      navigator.clipboard.writeText(color).then(function() {
+        console.log("Color successfully copied to clipboard");
+      });
+    }
+
+    function addColorOption(color) {
+      var colorGrid = document.getElementById("color-grid");
+      var colorOption = document.createElement("div");
+      colorOption.className = "color-option";
+      colorOption.style.backgroundColor = color;
+      colorOption.onclick = function() {
+        updateColor(color);
+      }
+      colorGrid.appendChild(colorOption);
+    }
+
+    // Load picked colors from local storage
+    document.addEventListener("DOMContentLoaded", function() {
+      var storedColors = JSON.parse(localStorage.getItem("pickedColors")) || [];
+      storedColors.forEach(function(color) {
+        addColorOption(color);
+      });
+    });
+  </script>
+</head>
+<body>
+  <h1 id="title">HTML Color Picker</h1>
+  <div id="color-picker" class="color-picker">
+    <label for="color-input">Pick a color:</label>
+    <div id="color-input-wrapper">
+      <input type="color" id="color-input" name="color-input" onchange="updateColor(this.value)">
+      <span>Pick a color</span>
+    </div>
+    <button onclick="copyColor()">Copy</button>
+    <div id="color-grid" class="color-grid">
+        <div class="color-option" style="background-color: #ff0000" onclick="updateColor('#ff0000')"></div>
+        <div class="color-option" style="background-color: #00ff00" onclick="updateColor('#00ff00')"></div>
+        <div class="color-option" style="background-color: #0000ff" onclick="updateColor('#0000ff')"></div>
+        <!-- Add more color options here -->
+    </div>
+    <div id="display-color">
+      Color: 
+    </div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
