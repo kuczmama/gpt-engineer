@@ -1,0 +1,59 @@
+:root {
+  --body-bg-color: #FAF8EF;
+  --table-bg-color: #BBADA0;
+  --cell-color: #eee4da;
+  --body-font: Arial, sans-serif;
+}
+
+body {
+  background-color: var(--body-bg-color);
+  background-image: url(background.jpg);
+  background-repeat: no-repeat; 
+  background-position: center center; 
+  background-attachment: fixed;
+  font-family: var(--body-font);
+  margin:0;
+  padding:0;
+  height: 100vh;
+  width: 100%;
+  text-align:center;
+}
+
+.container {
+  margin: 3rem auto 0 auto;
+  width: 80%;
+  max-width: 450px;
+}
+
+table {
+  background-color: var(--table-bg-color);
+  border-radius: 10px;
+  font-size: 2rem;
+  text-align: center;
+  margin: 70px auto 40px auto;
+  width: 100%;
+}
+
+td {
+  height: 3rem;
+  width: 3rem;
+  background-color: var(--cell-color);
+}
+
+button {
+  display: block;
+  margin: 20px auto 0 auto;
+}
+
+.button:hover {
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  td { height: 15vw; width: 15vw; }
+  table, .container { font-size: 3vw; }
+}
+
+table, td {
+  transition: all 0.2s ease-in-out;
+}

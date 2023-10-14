@@ -1,0 +1,37 @@
+body {
+  background-color: #FAF8EF;
+  font-family: Arial, sans-serif;
+  margin:0;
+  padding:0;
+  position: absolute;
+  height: 100%;
+  width: 100%;
+}
+
+html {
+  background: url(background.jpg) no-repeat center center fixed; 
+}
+
+.container {
+  margin: 50px auto 0 auto;
+  width: 450px;
+}
+
+table {
+  background: #BBADA0;
+  border-radius: 10px;
+  font-size: 40px;
+  text-align: center;
+  margin: 70px 0 40px 0;
+  width: 450px;
+}
+
+table, tr, td {
+  border: 0px solid #BBADA0;
+}
+
+td {
+  height: 100px;
+  width: 100px;
+  box-shadow: 0 0 15px #BBADA0;
+}

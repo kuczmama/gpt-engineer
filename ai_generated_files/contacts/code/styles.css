@@ -1,0 +1,19 @@
+/* Add any custom styles here */
+#rosterTable {
+  border-collapse: collapse;
+}
+
+#rosterTable th,
+#rosterTable td {
+  padding: 10px;
+  border: 1px solid black;
+  cursor: pointer;
+}
+
+#rosterTable th {
+  background-color: lightgray;
+}
+
+#rosterTable tr:hover {
+  background-color: rgb(230, 230, 230);
+}

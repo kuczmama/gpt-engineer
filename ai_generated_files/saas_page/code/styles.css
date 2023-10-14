@@ -1,0 +1,208 @@
+/* Add styles for the SAAS Product landing page */
+
+/* Reset CSS */
+html, body, div, span, applet, object, iframe,
+h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+a, abbr, acronym, address, big, b, cite, code,
+del, dfn, em, img, ins, kbd, q, s, samp,
+small, strike, strong, sub, sup, tt, var,
+dl, dt, dd, ol, ul, li,
+fieldset, form, label, legend,
+table, caption, tbody, tfoot, thead, tr, th, td {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-weight: inherit;
+  font-style: inherit;
+  font-size: 100%;
+  font-family: inherit;
+  vertical-align: baseline;
+}
+
+/* Global Styles */
+body {
+  font-family: Arial, sans-serif;
+  line-height: 1.5;
+  background-color: #f0f0f0;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+header {
+  background-color: #333;
+  padding: 20px 0;
+  color: #fff;
+}
+
+nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+nav ul li {
+  display: inline-block;
+  margin-right: 20px;
+}
+
+nav ul li a {
+  color: #fff;
+  text-decoration: none;
+}
+
+#hero {
+  background-image: url("hero-image.jpg");
+  background-size: cover;
+  background-position: center;
+  color: #fff;
+  padding: 100px;
+  text-align: center;
+}
+
+#hero h1 {
+  font-size: 36px;
+  margin-bottom: 20px;
+}
+
+#hero p {
+  font-size: 18px;
+  margin-bottom: 30px;
+}
+
+.cta-button {
+  text-decoration: none;
+  background-color: #39a2db;
+  color: #fff;
+  display: inline-block;
+  padding: 12px 20px;
+  border-radius: 5px;
+  font-weight: bold;
+}
+
+#features {
+  padding: 80px 0;
+  background-color: #fff;
+}
+
+#features h2 {
+  text-align: center;
+  margin-bottom: 50px;
+}
+
+#features ul {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  list-style: none;
+}
+
+#features li {
+  width: 300px;
+  margin: 20px;
+  text-align: center;
+}
+
+#features h3 {
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+#features p {
+  margin-bottom: 20px;
+}
+
+#pricing {
+  padding: 80px 0;
+  background-color: #f0f0f0;
+}
+
+#pricing h2 {
+  text-align: center;
+  margin-bottom: 50px;
+}
+
+#pricing ul {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  list-style: none;
+}
+
+#pricing li {
+  width: 300px;
+  margin: 20px;
+  text-align: center;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 5px;
+}
+
+#pricing h3 {
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+#pricing p {
+  margin-bottom: 20px;
+}
+
+.pricing-button {
+  text-decoration: none;
+  background-color: #39a2db;
+  color: #fff;
+  display: inline-block;
+  padding: 12px 20px;
+  border-radius: 5px;
+  font-weight: bold;
+}
+
+#contact {
+  padding: 80px 0;
+  background-color: #fff;
+}
+
+#contact h2 {
+  text-align: center;
+  margin-bottom: 50px;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+label {
+  margin-bottom: 10px;
+}
+
+input[type="text"],
+input[type="email"],
+textarea {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 20px;
+}
+
+input[type="submit"] {
+  background-color: #39a2db;
+  color: #fff;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 5px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+footer {
+  background-color: #333;
+  color: #fff;
+  text-align: center;
+  padding: 20px;
+}

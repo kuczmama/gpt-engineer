@@ -1,0 +1,27 @@
+/* CSS file for the National Debt Tracker */
+
+/* Provides styling for the body of the webpage */
+body {
+  text-align: center;
+}
+
+/* Sets the color of the h1 element to blue */
+h1 {
+  color: blue;
+}
+
+/* Styles the element with id 'debtValue' with a font size of 20px */
+#debtValue {
+  font-size: 20px;
+}
+
+/* Adds a top margin of 10px to the element with id 'fetchDebtButton' */
+#fetchDebtButton {
+  margin-top: 10px;
+}
+
+/* Provides styling for error messages */
+.error {
+  color: red;
+  font-weight: bold;
+}
