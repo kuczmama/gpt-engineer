@@ -7,12 +7,22 @@ import file_utils
 from os import walk
 import argparse
 import webbrowser
+import glob
+from dalle3 import Dalle
+import hashlib
+import requests
+
+CACHED_IMAGE_FOLDER = 'cached_images'
 
 openai.api_key = os.environ['OPENAI_API_KEY']
 DEFAULT_MODEL = "gpt-3.5-turbo-16k"
+INITIAL_DEVELOPER_MODEL = "ft:gpt-3.5-turbo-0613:personal::89edVQIv"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_FILE = "response_cache.json"
 MAX_ITERATIONS = 1
+IMAGE_SIZE = '256x256'
+BING_COOKIE = os.getenv("BING_COOKIE") or ""
+
 
 parser = argparse.ArgumentParser(description='argparse')
 parser.add_argument('--task', type=str, default=None,
@@ -36,6 +46,10 @@ print("Disable Human input: ", args.disable_human_input)
 if not os.path.exists(file_utils.OUTPUT_DIRECTORY):
     os.makedirs(file_utils.OUTPUT_DIRECTORY)
 
+# Ensure generic image folder exists
+if not os.path.exists(CACHED_IMAGE_FOLDER):
+    os.makedirs(CACHED_IMAGE_FOLDER)
+
 def load_cache():
     """Load cached data from the JSON file. If no file exists, return an empty dictionary."""
     if os.path.exists(CACHE_FILE):
@@ -49,7 +63,9 @@ def save_cache(cache_data):
     with open(CACHE_FILE, 'w') as f:
         json.dump(cache_data, f, indent=4)
 
-def get_response(messages):
+
+def get_response(messages, model=MODEL):
+    print(f"""Get response from OpenAI. using model = {model}""")
     cache_data = load_cache()
 
     # Convert the list of messages to a string so it can be used as a key for the dictionary
@@ -62,7 +78,7 @@ def get_response(messages):
 
     # If not in cache data, query OpenAI
     response = openai.ChatCompletion.create(
-        model=MODEL,
+        model=model,
         messages=messages
     )
     content = response.choices[0].message['content'].strip()
@@ -121,12 +137,12 @@ def extract_filename_and_code(response_content):
 
     return filenames_and_codes
 
-def prompt(content):
+def prompt(content, model=MODEL):
     messages = [
         {"role": "system", "content": prompts.PREAMBLE},
         {"role": "user", "content": content}
     ]
-    return get_response(messages)
+    return get_response(messages, model)
 
 def pm_breakdown_feature(user_input):
     content = prompts.pm_feature_list(user_input, "Product Manager")
@@ -136,7 +152,7 @@ def pm_breakdown_feature(user_input):
 
 def developer_initialize(user_input):
     content = prompts.developer_initialize(user_input, "Developer")
-    response = prompt(content)
+    response = prompt(content, INITIAL_DEVELOPER_MODEL)
     return extract_filename_and_code(response)
 
 def developer_handle_subtask(user_input, subtask, original_code):
@@ -154,20 +170,28 @@ def developer_fix_code_review(user_input, feature, comments, original_code):
     response = prompt(content)
     return extract_filename_and_code(response)
 
-def get_current_code_str(current_folder_name):
+def get_code_filepaths(current_folder_name):
     base_path = file_utils.get_code_directory(current_folder_name)
-    print(f"get_current_code: {base_path}")
-    response = ""
-    f = []
+    files_paths = []
     for (dirpath, dirnames, filenames) in walk(base_path):
-        f.extend(filenames)
+        for filename in filenames:
+            file_path = os.path.join(base_path, filename)
+            files_paths.append(file_path)
+    return files_paths
 
-    print("filenames: ", f)
-    for filename in f:
-        file_path = os.path.join(base_path, filename)
-        open(file_path, 'r').read()
+
+
+def get_current_code_str(current_folder_name):
+    file_paths = get_code_filepaths(current_folder_name)
+    print("file_paths: ", file_paths)
+    response = ""
+    for file_path in file_paths:
+        filename = os.path.basename(file_path)
+        file_path = os.path.join(file_path)
+        language = filename.split('.')[-1]
+        file_contents = open(file_path, 'r').read()
         response += f"[{filename}]\n"
-        response += f"```{filename.split('.')[-1]}\n{open(file_path, 'r').read()}\n```"
+        response += f"```{language}\n{file_contents}\n```"
         response += "\n\n"
 
     return response
@@ -178,6 +202,129 @@ def write_filenames_and_code(current_folder_name, filenames_and_codes):
     # Open a browser
     webbrowser.open(f"file://{os.path.realpath(file_utils.get_code_directory(current_folder_name))}/index.html",new=2)
 
+# This function parses image prompts in the format
+# [title]
+# ```
+# DESCRIPTION
+# ```
+# Return the image prompt like
+# [{filename: 'filename', prompt: 'prompt'}]
+#
+# e.g. [{filename: 'image.jpg', prompt: 'A picture of a cat'}]
+#
+def parse_image_prompts(text):
+    pattern = r'\[(.*?)\]\s+```\s(.*?)\s```'
+    matches = re.findall(pattern, text, re.DOTALL)
+
+    result = []
+    for match in matches:
+        data = {}
+        data['filename'] = match[0]
+        data['prompt'] = match[1].strip()
+        filename, prompt = match
+        print("File Name:", data['filename'])
+        print("Prompt:", data['prompt'])
+        print("----")
+        result.append(data)
+    return result
+
+# Generate images based on the functional requirements and code
+import os
+import hashlib
+import requests
+
+GENERIC_IMAGE_FOLDER = 'cached_images'
+
+# Ensure generic image folder exists
+if not os.path.exists(GENERIC_IMAGE_FOLDER):
+    os.makedirs(GENERIC_IMAGE_FOLDER)
+
+def generate_images(current_folder_name, user_input, functional_requirements, html_code):
+    content = prompts.ux_describe_images(user_input, "UX Designer", functional_requirements, html_code)
+
+    image_prompts = prompt(content)
+
+    parsed_image_prompts = parse_image_prompts(image_prompts)
+    image_details = []
+
+    for image_prompt_data in parsed_image_prompts:
+        filename = image_prompt_data['filename']
+        img_prompt = image_prompt_data['prompt']
+        breakpoint()
+
+        # Create a hash of the prompt to be used for checking the cache
+        prompt_hash = hashlib.sha256(img_prompt.encode()).hexdigest()
+
+        local_image_path = os.path.join(GENERIC_IMAGE_FOLDER, filename)
+
+        # Check if the image exists locally using the hash
+        if prompt_hash in get_cached_prompts():
+            image_details.append({
+                'filename': filename,
+                'prompt': img_prompt,
+                'local_url': local_image_path
+            })
+            continue
+
+        dalle = Dalle(BING_COOKIE)
+        dalle.open_website(img_prompt)
+
+        urls = dalle.get_urls()
+        image_url = urls[0]  # Just using the first URL as in your example
+        
+        download_img_from_url(image_url, GENERIC_IMAGE_FOLDER, filename)
+
+        # Update the cache
+        add_to_cache(prompt_hash)
+
+        image_details.append({
+            'filename': filename,
+            'prompt': img_prompt,
+            'local_url': local_image_path
+        })
+
+    return image_details
+
+def get_cached_prompts():
+    # This function reads a simple cache file to get a set of hashed prompts
+    with open('cache.txt', 'a+') as f:
+        f.seek(0)  # Move to the beginning of the file before reading
+        return set(line.strip() for line in f)
+
+def add_to_cache(prompt_hash):
+    # Appends a hashed prompt to the cache file
+    with open('cache.txt', 'a') as f:
+        f.write(prompt_hash + '\n')
+
+def download_img_from_url(url, directory, filename):
+    response = requests.get(url, stream=True)
+    response.raise_for_status()
+    with open(os.path.join(directory, filename), 'wb') as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+
+# Make sure you have the `requests` module installed: `pip install requests`
+
+def get_html_code(current_folder_name):
+    file_paths = get_code_filepaths(current_folder_name)
+    result = []
+    for file_path in file_paths:
+        filename = os.path.basename(file_path)
+        file_path = os.path.join(file_path)
+        language = filename.split('.')[-1]
+        if language == 'html':
+            file_contents = open(file_path, 'r').read()
+            result.append(f"[{filename}]\n")
+            result.append(f"```{language}\n{file_contents}\n```")
+            result.append("\n\n")
+    return result
+
+def place_images_in_html(current_folder_name, user_input, image_data, html_code):
+    content = prompts.full_stack_developer_place_images("Full Stack Developer",user_input, image_data, html_code)
+    breakpoint()
+    response = prompt(content)
+    breakpoint()
+    return extract_filename_and_code(response)
 
 def main():
     user_input = args.task
@@ -227,7 +374,18 @@ def main():
                 ai_comments,
                 get_current_code_str(current_folder_name))
             write_filenames_and_code(current_folder_name, filenames_and_codes)
-            
+
+            # Place images in the code
+            image_data = generate_images(
+                current_folder_name,
+                user_input,
+                "\n".join(subtasks),
+                get_html_code(current_folder_name))
+
+            filenames_and_codes = place_images_in_html(current_folder_name, user_input, image_data, get_html_code(current_folder_name))
+            write_filenames_and_code(current_folder_name, filenames_and_codes)
+
+
             if not args.disable_human_input:
                 print(f"Code can be found at {os.path.abspath(file_utils.get_code_directory(current_folder_name))}")
                 # Open webbrowser with the code running

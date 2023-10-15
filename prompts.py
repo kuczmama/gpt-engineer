@@ -6,10 +6,7 @@ PREAMBLE = """ChatDev is a software company powered by multiple intelligent
  through programming."""
 GUI = "The software should be equipped with graphical user interface (GUI) so that user can visually and graphically use it; Ideally this should be done with no dependencies like canvas in html."
 
-original_code = """
-[index.html]
-
-html
+html_code = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -25,6 +22,15 @@ html
     <script src="script.js"></script>
 </body>
 </html>
+"""
+
+original_code = """
+[index.html]
+
+```html
+{html_code}
+```
+
 [style.css]
 
 css
@@ -159,7 +165,8 @@ Think step by step and reason yourself to the right decisions to make sure we ge
 You will output the content of the complete code. Each file must strictly follow a 
 markdown code block format, where the following tokens must be replaced such that 
 \"FILENAME\" is the lowercase file name including the file extension, \"LANGUAGE\" 
-is the programming languag and \"CODE\" is the original code:
+is the programming language and \"CODE\" is the original code.  The code should have
+no comments, and you must respons with only the code and file-name... nothing
 
 [FILENAME]
 ```LANGUAGE
@@ -318,7 +325,82 @@ Original Code:
 You will start with the \"[index.html]\" file, then go to the ones that are imported by that file, and so on.
 Please note that the code should be fully functional. Ensure to implement all functions."""
 
+def ux_describe_images(role, task, functional_requirements, html_code):
+     return f"""
+    We have decided to complete the task through a executable software with
+    a static html website. As the {role}, you are tasked with defining images for "{task}"
+    to go on the website.  Each image must have a title and a detailed description. Each image must be visually similar to the previous one.
+    Think step by step and reason yourself to the right decisions to make sure we get it right.
+    The description should be a Dalle-3 prompt.  Limit your response to the most impactful
+    images to go on the website.
+    Before you start, make sure the image will actually be displayed on the website.
+    
+    Below are the 
+    functional requirements for the website:
 
+    {functional_requirements}
+
+    Here is the html code for the website:
+
+    ```html
+    {html_code}
+    ```
+    
+    The output must be in the following format:
+
+    [title]
+    ```
+    DESCRIPTION
+    ```
+
+    For example:
+
+    [logo.png]
+    ```
+    Design a logo for a 2D platformer game inspired by Super Mario. The game is called 'Plumber Pete's Adventure'. It should feature a cartoonish plumber character with a red hat and overalls, jumping on a brick platform with a gold coin above him against a bright blue sky background.
+    ```
+   """
+
+def full_stack_developer_place_images(role, task, image_data, html_code):
+     return f"""
+     After working with the UX Designer, they have designed images for the following task:
+Task: \"{task}\".
+We have decided to complete the task through a executable software with
+a static html website. As the {role}, you have already implemented the code
+below.  But, your job is to modify the code below to add the images the UX Designer
+has designed (assuming they are relevant).  
+
+Here are the urls and descriptions: {image_data}
+
+Think step by step and reason yourself to the right decisions to make sure we get it right.
+You will output the content of the complete code. Each file must strictly follow a 
+markdown code block format, where the following tokens must be replaced such that 
+\"FILENAME\" is the lowercase file name including the file extension, \"LANGUAGE\" 
+is the programming languag and \"CODE\" is the original code:
+
+[FILENAME]
+```LANGUAGE
+CODE
+```
+
+For example:
+
+[index.html]
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+  </head>
+</html>
+
+Below is the original html code you wrote:
+
+{html_code}
+```
+"""
+
+# print(full_stack_developer_place_images("Full Stack Developer", "A burrito shop landing page", image_data, htm))
+# print(ux_describe_images("UX Designer", "task", features, html_code))
 # print(pm_features("A mario clone", "Product Manager"))
 # print(developer_feature_work("A mario clone", "Developer", "Player character (Mario) can move left and right using keyboard input.", original_code))
 # print(developer_first_prompt("A mario clone", "Developer"))

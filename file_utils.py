@@ -3,6 +3,7 @@ import os
 OUTPUT_DIRECTORY = "ai_generated_files"
 CODE_SUBDIRECTORY = "code"
 TEST_SUBDIRECTORY = "tests"
+IMAGE_SUBDIRECTORY = "images"
 CODE_FILES = set()
 
 def sanitize_folder_name(name):
@@ -43,3 +44,6 @@ def write_to_file(project_folder_name, subdirectory, filename, content):
 
 def get_code_directory(project_folder_name):
     return os.path.join(OUTPUT_DIRECTORY, project_folder_name, CODE_SUBDIRECTORY)
+
+def get_image_directory(project_folder_name):
+    return os.path.join(OUTPUT_DIRECTORY, project_folder_name, IMAGE_SUBDIRECTORY)
