@@ -262,6 +262,10 @@ def developer_select_file_from_summary(task, summary):
         If no file makes sense, please return none.
 
         Only respond with the file name or "none".  Do not respond with any other information.
+
+        Example:
+
+        main.py
     """     
 
 # A follow up prompt to the developer to focus on implementing

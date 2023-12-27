@@ -75,6 +75,7 @@ def get_response(messages, model=MODEL):
 
     # Convert the list of messages to a string so it can be used as a key for the dictionary
     message_str = json.dumps(messages)
+    print(f"\n[DEBUG - Assistant Input]\n#{message_str}\n[DEBUG END]\n")
 
     # Check if the message exists in the cache
     if message_str in cache_data:
@@ -330,6 +331,16 @@ def get_html_code(current_folder_name):
             result.append("\n\n")
     return result
 
+# Get the code markdown for a specific file, or all files if none is specified
+def get_code_markdown(current_folder_name, file_name):
+    if file_name != "none":
+        print(f"Developer selected file: {file_name}")
+        file_path = os.path.join(file_utils.get_code_directory(current_folder_name), file_name)
+        return get_code_markdown_for_specific_file(file_path)
+    else:
+        print("Get code markdown for all files")
+        return get_code_markdown_for_all_files(current_folder_name)
+
 # def place_images_in_html(current_folder_name, user_input, image_data, html_code):
 #     content = prompts.full_stack_developer_place_images("Full Stack Developer",user_input, image_data, html_code)
 #     breakpoint()
@@ -380,29 +391,28 @@ def main():
             print(f"Handling subtask: {subtask}")
             file_name = developer_select_file_from_summary(subtask, project_summary.get_summary())
 
-            # Get the code for the file we're working on
-            code_markdown = ""
-            if file_name != "none":
-                print(f"Developer selected file: {file_name}")
-                file_path = os.path.join(file_utils.get_code_directory(current_folder_name), file_name)
-                code_markdown = get_code_markdown_for_specific_file(file_path)
-            else:
-                code_markdown = get_code_markdown_for_all_files(current_folder_name)
-
             filenames_and_codes = developer_handle_subtask(
                 user_input,
                 subtask,
-                code_markdown)
+                get_code_markdown(current_folder_name, file_name))
             persist_file_names_and_code(current_folder_name, filenames_and_codes)
+            # Summarize the project
+            for filename, code in filenames_and_codes:
+                summary = developer_summarize_file(filename, code)
+                project_summary.add_file_summary(filename, summary)
             print("Doing code review")
-            ai_comments = get_code_review(user_input, subtask, get_code_markdown_for_all_files(current_folder_name))
+            ai_comments = get_code_review(user_input, subtask, get_code_markdown(current_folder_name, file_name))
 
             print("Fixing code from AI comments")
             filenames_and_codes = developer_fix_code_review(
                 user_input,
                 subtask,
                 ai_comments,
-                get_code_markdown_for_all_files(current_folder_name))
+                get_code_markdown(current_folder_name, file_name))
+            # Summarize the project
+            for filename, code in filenames_and_codes:
+                summary = developer_summarize_file(filename, code)
+                project_summary.add_file_summary(filename, summary)
             persist_file_names_and_code(current_folder_name, filenames_and_codes)
 
             # Place images in the code
@@ -413,8 +423,7 @@ def main():
             #     get_html_code(current_folder_name))
 
             # filenames_and_codes = place_images_in_html(current_folder_name, user_input, image_data, get_html_code(current_folder_name))
-            persist_file_names_and_code(current_folder_name, filenames_and_codes)
-
+            # persist_file_names_and_code(current_folder_name, filenames_and_codes)
 
             # TODO - Summarize the project
             if not args.disable_human_input:
@@ -425,7 +434,11 @@ def main():
                     user_input,
                     subtask,
                     user_comments,
-                    get_code_markdown_for_all_files(current_folder_name))
+                    get_code_markdown(current_folder_name, file_name))
+                # Summarize the project
+                for filename, code in filenames_and_codes:
+                    summary = developer_summarize_file(filename, code)
+                    project_summary.add_file_summary(filename, summary)
                 persist_file_names_and_code(current_folder_name, filenames_and_codes)
 
 if __name__ == '__main__':
