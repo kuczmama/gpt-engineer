@@ -11,17 +11,22 @@ import glob
 from dalle3 import Dalle
 import hashlib
 import requests
+from project_summary import ProjectSummary
 
 CACHED_IMAGE_FOLDER = 'cached_images'
 
 openai.api_key = os.environ['OPENAI_API_KEY']
 DEFAULT_MODEL = "gpt-3.5-turbo-16k"
-INITIAL_DEVELOPER_MODEL = "ft:gpt-3.5-turbo-0613:personal::89edVQIv"
+
+# INITIAL_DEVELOPER_MODEL = "ft:gpt-3.5-turbo-0613:personal::89edVQIv"
+INITIAL_DEVELOPER_MODEL = "gpt-3.5-turbo-1106"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_FILE = "response_cache.json"
 MAX_ITERATIONS = 1
 IMAGE_SIZE = '256x256'
 BING_COOKIE = os.getenv("BING_COOKIE") or ""
+# Generate images based on the functional requirements and code
+GENERIC_IMAGE_FOLDER = 'cached_images'
 
 
 parser = argparse.ArgumentParser(description='argparse')
@@ -170,6 +175,16 @@ def developer_fix_code_review(user_input, feature, comments, original_code):
     response = prompt(content)
     return extract_filename_and_code(response)
 
+def developer_summarize_file(file_name, code):
+    content = prompts.code_summarizer(file_name, code)
+    code_summary = prompt(content)
+    return code_summary
+
+def developer_select_file_from_summary(task, summary):
+    content = prompts.developer_select_file_from_summary(task, summary)
+    response = prompt(content)
+    return response
+
 def get_code_filepaths(current_folder_name):
     base_path = file_utils.get_code_directory(current_folder_name)
     files_paths = []
@@ -180,23 +195,26 @@ def get_code_filepaths(current_folder_name):
     return files_paths
 
 
+def get_code_markdown_for_specific_file(file_path):
+    filename = os.path.basename(file_path)
+    file_path = os.path.join(file_path)
+    language = filename.split('.')[-1]
+    file_contents = open(file_path, 'r').read()
+    response = ""
+    response += f"[{filename}]\n"
+    response += f"```{language}\n{file_contents}\n```"
+    response += "\n\n"
+    return response
 
-def get_current_code_str(current_folder_name):
+def get_code_markdown_for_all_files(current_folder_name):
     file_paths = get_code_filepaths(current_folder_name)
     print("file_paths: ", file_paths)
     response = ""
     for file_path in file_paths:
-        filename = os.path.basename(file_path)
-        file_path = os.path.join(file_path)
-        language = filename.split('.')[-1]
-        file_contents = open(file_path, 'r').read()
-        response += f"[{filename}]\n"
-        response += f"```{language}\n{file_contents}\n```"
-        response += "\n\n"
+        response += get_code_markdown_for_specific_file(file_path)
 
     return response
-
-def write_filenames_and_code(current_folder_name, filenames_and_codes):
+def persist_file_names_and_code(current_folder_name, filenames_and_codes):
     for filename, code in filenames_and_codes:
         file_utils.write_to_file(current_folder_name, file_utils.CODE_SUBDIRECTORY, filename, code)
     # Open a browser
@@ -227,13 +245,6 @@ def parse_image_prompts(text):
         print("----")
         result.append(data)
     return result
-
-# Generate images based on the functional requirements and code
-import os
-import hashlib
-import requests
-
-GENERIC_IMAGE_FOLDER = 'cached_images'
 
 # Ensure generic image folder exists
 if not os.path.exists(GENERIC_IMAGE_FOLDER):
@@ -342,6 +353,8 @@ def main():
     # # # Create code and tests subdirectories for the current folder
     os.makedirs(os.path.join(file_utils.OUTPUT_DIRECTORY, current_folder_name, file_utils.CODE_SUBDIRECTORY))
 
+    project_summary = ProjectSummary()
+
     for i in range(MAX_ITERATIONS):
         print(f"\n[Iteration {i + 1}]")
         print("[Debug] Generating subtasks for PM")
@@ -352,32 +365,45 @@ def main():
             continue
 
         filenames_and_codes = developer_initialize(user_input)
-        write_filenames_and_code(current_folder_name, filenames_and_codes)
+        persist_file_names_and_code(current_folder_name, filenames_and_codes)
         # Summarize the project
+        for filename, code in filenames_and_codes:
+            summary = developer_summarize_file(filename, code)
+            project_summary.add_file_summary(filename, summary)
+        print("Project summary:")
+        print(project_summary.get_summary())
 
         print("Current Code:")
-        print(get_current_code_str(current_folder_name))
+        print(get_code_markdown_for_all_files(current_folder_name))
         
         for subtask in subtasks:
             print(f"Handling subtask: {subtask}")
-            # Update the current code based on the subtask
-            # TODO - select what part of the code to use
+            file_name = developer_select_file_from_summary(subtask, project_summary.get_summary())
+
+            # Get the code for the file we're working on
+            code_markdown = ""
+            if file_name != "none":
+                print(f"Developer selected file: {file_name}")
+                file_path = os.path.join(file_utils.get_code_directory(current_folder_name), file_name)
+                code_markdown = get_code_markdown_for_specific_file(file_path)
+            else:
+                code_markdown = get_code_markdown_for_all_files(current_folder_name)
 
             filenames_and_codes = developer_handle_subtask(
                 user_input,
                 subtask,
-                get_current_code_str(current_folder_name))
-            write_filenames_and_code(current_folder_name, filenames_and_codes)
+                code_markdown)
+            persist_file_names_and_code(current_folder_name, filenames_and_codes)
             print("Doing code review")
-            ai_comments = get_code_review(user_input, subtask, get_current_code_str(current_folder_name))
+            ai_comments = get_code_review(user_input, subtask, get_code_markdown_for_all_files(current_folder_name))
 
             print("Fixing code from AI comments")
             filenames_and_codes = developer_fix_code_review(
                 user_input,
                 subtask,
                 ai_comments,
-                get_current_code_str(current_folder_name))
-            write_filenames_and_code(current_folder_name, filenames_and_codes)
+                get_code_markdown_for_all_files(current_folder_name))
+            persist_file_names_and_code(current_folder_name, filenames_and_codes)
 
             # Place images in the code
             # image_data = generate_images(
@@ -387,7 +413,7 @@ def main():
             #     get_html_code(current_folder_name))
 
             # filenames_and_codes = place_images_in_html(current_folder_name, user_input, image_data, get_html_code(current_folder_name))
-            write_filenames_and_code(current_folder_name, filenames_and_codes)
+            persist_file_names_and_code(current_folder_name, filenames_and_codes)
 
 
             # TODO - Summarize the project
@@ -399,8 +425,8 @@ def main():
                     user_input,
                     subtask,
                     user_comments,
-                    get_current_code_str(current_folder_name))
-                write_filenames_and_code(current_folder_name, filenames_and_codes)
+                    get_code_markdown_for_all_files(current_folder_name))
+                persist_file_names_and_code(current_folder_name, filenames_and_codes)
 
 if __name__ == '__main__':
     try:

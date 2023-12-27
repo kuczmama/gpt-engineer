@@ -251,6 +251,19 @@ We have decided to complete the task through a executable software with
 
 """
 
+def developer_select_file_from_summary(task, summary):
+    return f"""
+        According to the new user's task and a summary of the software we have written below:
+        Task: \"{task}\".
+        Summary: \"{summary}\"
+
+        Your job is to select which file to use to implement the new feature.
+        Think step by step and reason yourself to the right decisions to make sure we get it right.
+        If no file makes sense, please return none.
+
+        Only respond with the file name or "none".  Do not respond with any other information.
+    """     
+
 # A follow up prompt to the developer to focus on implementing
 # The given feature from a pm
 def developer_feature_work(task, role, feature, original_code):
