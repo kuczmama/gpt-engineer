@@ -1,3 +1,5 @@
+import file_utils
+
 
 PREAMBLE = """ChatDev is a software company powered by multiple intelligent
  agents, such as chief executive officer, chief human resources officer, 
@@ -186,6 +188,17 @@ For example:
 
 You will start with the \"[index.html]\" file, then go to the ones that are imported by that file, and so on.
 Please note that the code should be fully functional. Ensure to implement all functions."""
+
+def code_summarizer(file_name, code):
+     return f"""
+Your job is to give a high level description of the code for a given file.  
+Think step by step and reason yourself to the right decisions to make sure we get it right.
+The summary should be just a single sentence.  For example to summarize file_utils.js.
+
+A javascript file used to read and write arbitrary data to files.
+
+Code: \"{code}\"
+     """
 
 def code_reviewer(task, role, feature, code):
         return f""" 
@@ -405,4 +418,4 @@ Below is the original html code you wrote:
 # print(developer_feature_work("A mario clone", "Developer", "Player character (Mario) can move left and right using keyboard input.", original_code))
 # print(developer_first_prompt("A mario clone", "Developer"))
 # print(code_reviewer("A mario clone", "Code Reviewer", features[1], original_code))
-
+# print(code_summarizer('file_utils.py', file_utils.file_to_string('file_utils.py')))

@@ -319,13 +319,14 @@ def get_html_code(current_folder_name):
             result.append("\n\n")
     return result
 
-def place_images_in_html(current_folder_name, user_input, image_data, html_code):
-    content = prompts.full_stack_developer_place_images("Full Stack Developer",user_input, image_data, html_code)
-    breakpoint()
-    response = prompt(content)
-    breakpoint()
-    return extract_filename_and_code(response)
+# def place_images_in_html(current_folder_name, user_input, image_data, html_code):
+#     content = prompts.full_stack_developer_place_images("Full Stack Developer",user_input, image_data, html_code)
+#     breakpoint()
+#     response = prompt(content)
+#     breakpoint()
+#     return extract_filename_and_code(response)
 
+# TODO - use the summaries of the code to be able to program arbitrarily large code-bases
 def main():
     user_input = args.task
     project_name = args.name
@@ -340,7 +341,7 @@ def main():
 
     # # # Create code and tests subdirectories for the current folder
     os.makedirs(os.path.join(file_utils.OUTPUT_DIRECTORY, current_folder_name, file_utils.CODE_SUBDIRECTORY))
-    
+
     for i in range(MAX_ITERATIONS):
         print(f"\n[Iteration {i + 1}]")
         print("[Debug] Generating subtasks for PM")
@@ -352,6 +353,7 @@ def main():
 
         filenames_and_codes = developer_initialize(user_input)
         write_filenames_and_code(current_folder_name, filenames_and_codes)
+        # Summarize the project
 
         print("Current Code:")
         print(get_current_code_str(current_folder_name))
@@ -359,6 +361,8 @@ def main():
         for subtask in subtasks:
             print(f"Handling subtask: {subtask}")
             # Update the current code based on the subtask
+            # TODO - select what part of the code to use
+
             filenames_and_codes = developer_handle_subtask(
                 user_input,
                 subtask,
@@ -376,16 +380,17 @@ def main():
             write_filenames_and_code(current_folder_name, filenames_and_codes)
 
             # Place images in the code
-            image_data = generate_images(
-                current_folder_name,
-                user_input,
-                "\n".join(subtasks),
-                get_html_code(current_folder_name))
+            # image_data = generate_images(
+            #     current_folder_name,
+            #     user_input,
+            #     "\n".join(subtasks),
+            #     get_html_code(current_folder_name))
 
-            filenames_and_codes = place_images_in_html(current_folder_name, user_input, image_data, get_html_code(current_folder_name))
+            # filenames_and_codes = place_images_in_html(current_folder_name, user_input, image_data, get_html_code(current_folder_name))
             write_filenames_and_code(current_folder_name, filenames_and_codes)
 
 
+            # TODO - Summarize the project
             if not args.disable_human_input:
                 print(f"Code can be found at {os.path.abspath(file_utils.get_code_directory(current_folder_name))}")
                 # Open webbrowser with the code running
