@@ -11,12 +11,13 @@ import glob
 from dalle3 import Dalle
 import hashlib
 import requests
+import pdb
 from project_summary import ProjectSummary
 
 CACHED_IMAGE_FOLDER = 'cached_images'
 
 openai.api_key = os.environ['OPENAI_API_KEY']
-DEFAULT_MODEL = "gpt-3.5-turbo-16k"
+DEFAULT_MODEL = "gpt-3.5-turbo-1106"
 
 # INITIAL_DEVELOPER_MODEL = "ft:gpt-3.5-turbo-0613:personal::89edVQIv"
 INITIAL_DEVELOPER_MODEL = "gpt-3.5-turbo-1106"
@@ -27,7 +28,17 @@ IMAGE_SIZE = '256x256'
 BING_COOKIE = os.getenv("BING_COOKIE") or ""
 # Generate images based on the functional requirements and code
 GENERIC_IMAGE_FOLDER = 'cached_images'
+running_total_cost = 0
 
+# Price per 1000 tokens
+TOKEN_PRICE = {
+    "gpt-3.5-turbo-1106": {"input": 0.0010, "output": 0.0020},
+    "gpt-3.5-turbo-instruct": {"input": 0.0015, "output": 0.0020},
+    "gpt-4": {"input": 0.03, "output": 0.06},
+    "gpt-4-32k": {"input": 0.06, "output": 0.12},
+    "gpt-4-1106-preview": {"input": 0.01, "output": 0.03},
+    "gpt-4-1106-vision-preview": {"input": 0.01 , "output": 0.03},
+}
 
 parser = argparse.ArgumentParser(description='argparse')
 parser.add_argument('--task', type=str, default=None,
@@ -69,7 +80,14 @@ def save_cache(cache_data):
         json.dump(cache_data, f, indent=4)
 
 
+def count_tokens(text):
+    """Count the number of tokens in a given text."""
+    # The actual tokenization logic may vary based on how OpenAI counts tokens
+    return len(text.split())
+
 def get_response(messages, model=MODEL):
+    global running_total_cost
+
     print(f"""Get response from OpenAI. using model = {model}""")
     cache_data = load_cache()
 
@@ -87,8 +105,21 @@ def get_response(messages, model=MODEL):
         model=model,
         messages=messages
     )
+
+    # Calculate cost
+    prompt_tokens = response["usage"]["prompt_tokens"]
+    completion_tokens = response["usage"]["completion_tokens"]
+    costs = TOKEN_PRICE.get(model, {"input": 0, "output": 0})  # Default to 0 if model not found
+    input_costs = costs["input"] * prompt_tokens / 1000.0
+    output_costs = costs["output"] * completion_tokens / 1000.0
+
+    cost = input_costs + output_costs
+    running_total_cost += cost
+    print(f"💰Cost for this request: ${cost}")
+    print(f"🤑Running total cost: ${running_total_cost}")
+
     content = response.choices[0].message['content'].strip()
-    print(f"\n[DEBUG - Assistant's Response]\n{content}\n[DEBUG END]\n")
+    print(f"\n👨‍⚕️[DEBUG - Assistant's Response]\n{content}\n[DEBUG END]\n")
     
     # Save the new response to the cache
     cache_data[message_str] = content
@@ -381,7 +412,7 @@ def main():
         for filename, code in filenames_and_codes:
             summary = developer_summarize_file(filename, code)
             project_summary.add_file_summary(filename, summary)
-        print("Project summary:")
+        print("✍️Project summary:")
         print(project_summary.get_summary())
 
         print("Current Code:")
@@ -400,7 +431,7 @@ def main():
             for filename, code in filenames_and_codes:
                 summary = developer_summarize_file(filename, code)
                 project_summary.add_file_summary(filename, summary)
-            print("Doing code review")
+            print("🐞Doing code review")
             ai_comments = get_code_review(user_input, subtask, get_code_markdown(current_folder_name, file_name))
 
             print("Fixing code from AI comments")
