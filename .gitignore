@@ -2,3 +2,4 @@ response_cache.json
 __pycache__
 ai_generated_files
 .vscode
+app.log

@@ -10,6 +10,8 @@ import webbrowser
 import glob
 from dalle3 import Dalle
 import hashlib
+import logging
+from logging.handlers import RotatingFileHandler
 import requests
 import pdb
 from project_summary import ProjectSummary
@@ -18,6 +20,7 @@ CACHED_IMAGE_FOLDER = 'cached_images'
 
 openai.api_key = os.environ['OPENAI_API_KEY']
 DEFAULT_MODEL = "gpt-3.5-turbo-1106"
+LOG_FILE = 'app.log'
 
 # INITIAL_DEVELOPER_MODEL = "ft:gpt-3.5-turbo-0613:personal::89edVQIv"
 INITIAL_DEVELOPER_MODEL = "gpt-3.5-turbo-1106"
@@ -29,6 +32,8 @@ BING_COOKIE = os.getenv("BING_COOKIE") or ""
 # Generate images based on the functional requirements and code
 GENERIC_IMAGE_FOLDER = 'cached_images'
 running_total_cost = 0
+logging.basicConfig(filename=LOG_FILE, filemode='w', format='%(name)s - %(levelname)s - %(message)s')
+
 
 # Price per 1000 tokens
 TOKEN_PRICE = {
@@ -50,13 +55,13 @@ parser.add_argument('--model', type=str, default=DEFAULT_MODEL,
 parser.add_argument('-dhi', '--disable-human-input', help="Enable human input", action='store_true')
 
 args = parser.parse_args()
-# print (f"Args: {args}")
+# logging.info (f"Args: {args}")
 
 MODEL = args.model
-print("Using model: " + MODEL)
-print("Task: ", args.task)
-print("Name: ", args.name)
-print("Disable Human input: ", args.disable_human_input)
+logging.info("Using model: " + MODEL)
+logging.info("Task: ", args.task)
+logging.info("Name: ", args.name)
+logging.info("Disable Human input: ", args.disable_human_input)
 
 # Ensure the output directory exists
 if not os.path.exists(file_utils.OUTPUT_DIRECTORY):
@@ -65,6 +70,32 @@ if not os.path.exists(file_utils.OUTPUT_DIRECTORY):
 # Ensure generic image folder exists
 if not os.path.exists(CACHED_IMAGE_FOLDER):
     os.makedirs(CACHED_IMAGE_FOLDER)
+
+def setup_logging():
+    # Create a logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)  # Set to DEBUG to capture all levels of logs
+
+    # Create handlers (file and console)
+    file_handler = RotatingFileHandler('app.log', maxBytes=1024 * 1024 * 5, backupCount=2)
+    console_handler = logging.StreamHandler()
+
+    # Set logging level for handlers
+    file_handler.setLevel(logging.INFO)
+    console_handler.setLevel(logging.DEBUG)
+
+    # Create a logging format
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                                  datefmt='%Y-%m-%d %H:%M:%S')
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+
+    # Add the handlers to the logger
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+
+# Call the setup_logging function at the beginning of your script
+setup_logging()
 
 def load_cache():
     """Load cached data from the JSON file. If no file exists, return an empty dictionary."""
@@ -88,16 +119,16 @@ def count_tokens(text):
 def get_response(messages, model=MODEL):
     global running_total_cost
 
-    print(f"""Get response from OpenAI. using model = {model}""")
+    logging.info(f"""Get response from OpenAI. using model = {model}""")
     cache_data = load_cache()
 
     # Convert the list of messages to a string so it can be used as a key for the dictionary
     message_str = json.dumps(messages)
-    print(f"\n[DEBUG - Assistant Input]\n#{message_str}\n[DEBUG END]\n")
+    logging.debug(f"\n[DEBUG - Assistant Input]\n#{message_str}\n[DEBUG END]\n")
 
     # Check if the message exists in the cache
     if message_str in cache_data:
-        print(f"\n[DEBUG - Cached Response]\n{cache_data[message_str]}\n[DEBUG END]\n")
+        logging.debug(f"\n[DEBUG - Cached Response]\n{cache_data[message_str]}\n[DEBUG END]\n")
         return cache_data[message_str]
 
     # If not in cache data, query OpenAI
@@ -115,11 +146,11 @@ def get_response(messages, model=MODEL):
 
     cost = input_costs + output_costs
     running_total_cost += cost
-    print(f"💰Cost for this request: ${cost}")
-    print(f"🤑Running total cost: ${running_total_cost}")
+    logging.info(f"💰Cost for this request: ${cost}")
+    logging.info(f"🤑Running total cost: ${running_total_cost}")
 
     content = response.choices[0].message['content'].strip()
-    print(f"\n👨‍⚕️[DEBUG - Assistant's Response]\n{content}\n[DEBUG END]\n")
+    logging.debug(f"\n👨‍⚕️[DEBUG - Assistant's Response]\n{content}\n[DEBUG END]\n")
     
     # Save the new response to the cache
     cache_data[message_str] = content
@@ -128,7 +159,7 @@ def get_response(messages, model=MODEL):
     return content
 
 def extract_filename_and_code(response_content):
-    print(f"Extract_filename_and_code")
+    logging.info(f"Extract_filename_and_code")
     # Regex pattern
     filename_pattern = r'\[(?P<filename>[a-zA-Z0-9_\-]+\.(?:html|css|js|py|java|cpp|go|rs|php|swift))\]'
     code_pattern = r'```(?:\w*\s*)?(.*?)```'
@@ -141,7 +172,7 @@ def extract_filename_and_code(response_content):
 
         # If filename isn't found, break out of the loop
         if not filename_match:
-            print(f"No filename found in response. {response_content}")
+            logging.info(f"No filename found in response. {response_content}")
             break
 
         # Get the position where the filename match ends
@@ -153,7 +184,7 @@ def extract_filename_and_code(response_content):
         # If code isn't found after a filename, abort the program
         if not code_match:
             if len(filenames_and_codes) > 0:
-                print(f"Code not found after filename in response. Returning {len(filenames_and_codes)} filenames and codes.")
+                logging.info(f"Code not found after filename in response. Returning {len(filenames_and_codes)} filenames and codes.")
                 return filenames_and_codes
             raise Exception("Code not found after filename in response. Aborting program.")
 
@@ -240,7 +271,7 @@ def get_code_markdown_for_specific_file(file_path):
 
 def get_code_markdown_for_all_files(current_folder_name):
     file_paths = get_code_filepaths(current_folder_name)
-    print("file_paths: ", file_paths)
+    logging.info("file_paths: ", file_paths)
     response = ""
     for file_path in file_paths:
         response += get_code_markdown_for_specific_file(file_path)
@@ -272,9 +303,9 @@ def parse_image_prompts(text):
         data['filename'] = match[0]
         data['prompt'] = match[1].strip()
         filename, prompt = match
-        print("File Name:", data['filename'])
-        print("Prompt:", data['prompt'])
-        print("----")
+        logging.info("File Name:", data['filename'])
+        logging.info("Prompt:", data['prompt'])
+        logging.info("----")
         result.append(data)
     return result
 
@@ -365,11 +396,11 @@ def get_html_code(current_folder_name):
 # Get the code markdown for a specific file, or all files if none is specified
 def get_code_markdown(current_folder_name, file_name):
     if file_name != "none":
-        print(f"Developer selected file: {file_name}")
+        logging.info(f"Developer selected file: {file_name}")
         file_path = os.path.join(file_utils.get_code_directory(current_folder_name), file_name)
         return get_code_markdown_for_specific_file(file_path)
     else:
-        print("Get code markdown for all files")
+        logging.info("Get code markdown for all files")
         return get_code_markdown_for_all_files(current_folder_name)
 
 # def place_images_in_html(current_folder_name, user_input, image_data, html_code):
@@ -398,12 +429,12 @@ def main():
     project_summary = ProjectSummary()
 
     for i in range(MAX_ITERATIONS):
-        print(f"\n[Iteration {i + 1}]")
-        print("[Debug] Generating subtasks for PM")
+        logging.info(f"\n[Iteration {i + 1}]")
+        logging.info("[Debug] Generating subtasks for PM")
         subtasks = pm_breakdown_feature(user_input)
-        print(f"PM Generated ({len(subtasks)} subtasks)")
+        logging.info(f"PM Generated ({len(subtasks)} subtasks)")
         if not subtasks:
-            print("Unable to generate subtasks. Try again.")
+            logging.info("Unable to generate subtasks. Try again.")
             continue
 
         filenames_and_codes = developer_initialize(user_input)
@@ -412,14 +443,14 @@ def main():
         for filename, code in filenames_and_codes:
             summary = developer_summarize_file(filename, code)
             project_summary.add_file_summary(filename, summary)
-        print("✍️Project summary:")
-        print(project_summary.get_summary())
+        logging.info("✍️Project summary:")
+        logging.info(project_summary.get_summary())
 
-        print("Current Code:")
-        print(get_code_markdown_for_all_files(current_folder_name))
+        logging.info("Current Code:")
+        logging.info(get_code_markdown_for_all_files(current_folder_name))
         
         for subtask in subtasks:
-            print(f"Handling subtask: {subtask}")
+            logging.info(f"Handling subtask: {subtask}")
             file_name = developer_select_file_from_summary(subtask, project_summary.get_summary())
 
             filenames_and_codes = developer_handle_subtask(
@@ -431,10 +462,10 @@ def main():
             for filename, code in filenames_and_codes:
                 summary = developer_summarize_file(filename, code)
                 project_summary.add_file_summary(filename, summary)
-            print("🐞Doing code review")
+            logging.info("🐞Doing code review")
             ai_comments = get_code_review(user_input, subtask, get_code_markdown(current_folder_name, file_name))
 
-            print("Fixing code from AI comments")
+            logging.info("Fixing code from AI comments")
             filenames_and_codes = developer_fix_code_review(
                 user_input,
                 subtask,
@@ -458,7 +489,7 @@ def main():
 
             # TODO - Summarize the project
             if not args.disable_human_input:
-                print(f"Code can be found at {os.path.abspath(file_utils.get_code_directory(current_folder_name))}")
+                logging.info(f"Code can be found at {os.path.abspath(file_utils.get_code_directory(current_folder_name))}")
                 # Open webbrowser with the code running
                 user_comments = input("\nWhat feedback do you want to give? ")
                 filenames_and_codes = developer_fix_code_review(
@@ -476,4 +507,4 @@ if __name__ == '__main__':
     try:
         main()
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logging.info(f"An error occurred: {e}")
