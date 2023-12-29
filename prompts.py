@@ -200,11 +200,12 @@ A javascript file used to read and write arbitrary data to files.
 Code: \"{code}\"
      """
 
-def code_reviewer(task, role, feature, code):
+def code_reviewer(task, role, feature, summary, code):
         return f""" 
 According to the new user's task and our software designs listed below: 
 Task: \"{task}\".
 Feature: \"{feature}\"
+
 We have decided to complete the task through a executable software with
 a static html website. As a {role}, you are tasked with reviewing the code, and providing feedback.
 Think step by step and reason yourself to the right decisions to make sure we get it right.
@@ -225,7 +226,10 @@ feedback2
 feedback3
 ```
 
-Below is the original code you are commenting on:
+Below is a summary of all of the code we have written so far, make sure the code works based on the summary.
+Summary: \"{summary}\".
+
+Below is the original code file you are commenting on:
 
 {code}
 

@@ -8,10 +8,10 @@ from os import walk
 import argparse
 import webbrowser
 import glob
-from dalle3 import Dalle
-import hashlib
 import logging
-from logging.handlers import RotatingFileHandler
+from dalle3 import Dalle
+import log_util
+import hashlib
 import requests
 import pdb
 from project_summary import ProjectSummary
@@ -20,9 +20,7 @@ CACHED_IMAGE_FOLDER = 'cached_images'
 
 openai.api_key = os.environ['OPENAI_API_KEY']
 DEFAULT_MODEL = "gpt-3.5-turbo-1106"
-LOG_FILE = 'app.log'
 
-# INITIAL_DEVELOPER_MODEL = "ft:gpt-3.5-turbo-0613:personal::89edVQIv"
 INITIAL_DEVELOPER_MODEL = "gpt-3.5-turbo-1106"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_FILE = "response_cache.json"
@@ -32,7 +30,6 @@ BING_COOKIE = os.getenv("BING_COOKIE") or ""
 # Generate images based on the functional requirements and code
 GENERIC_IMAGE_FOLDER = 'cached_images'
 running_total_cost = 0
-logging.basicConfig(filename=LOG_FILE, filemode='w', format='%(name)s - %(levelname)s - %(message)s')
 
 
 # Price per 1000 tokens
@@ -71,31 +68,8 @@ if not os.path.exists(file_utils.OUTPUT_DIRECTORY):
 if not os.path.exists(CACHED_IMAGE_FOLDER):
     os.makedirs(CACHED_IMAGE_FOLDER)
 
-def setup_logging():
-    # Create a logger
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)  # Set to DEBUG to capture all levels of logs
 
-    # Create handlers (file and console)
-    file_handler = RotatingFileHandler('app.log', maxBytes=1024 * 1024 * 5, backupCount=2)
-    console_handler = logging.StreamHandler()
-
-    # Set logging level for handlers
-    file_handler.setLevel(logging.INFO)
-    console_handler.setLevel(logging.DEBUG)
-
-    # Create a logging format
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                                  datefmt='%Y-%m-%d %H:%M:%S')
-    file_handler.setFormatter(formatter)
-    console_handler.setFormatter(formatter)
-
-    # Add the handlers to the logger
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-
-# Call the setup_logging function at the beginning of your script
-setup_logging()
+log_util.setup_logging()
 
 def load_cache():
     """Load cached data from the JSON file. If no file exists, return an empty dictionary."""
@@ -228,8 +202,8 @@ def developer_handle_subtask(user_input, subtask, original_code):
     response = prompt(content)
     return extract_filename_and_code(response)
 
-def get_code_review(user_input, subtask, original_code):
-    content = prompts.code_reviewer(user_input, "Code Reviewer", subtask, original_code)
+def get_code_review(user_input, subtask, summary, original_code):
+    content = prompts.code_reviewer(user_input, "Code Reviewer", summary, subtask, original_code)
     response = prompt(content)
     return response
 
@@ -463,19 +437,21 @@ def main():
                 summary = developer_summarize_file(filename, code)
                 project_summary.add_file_summary(filename, summary)
             logging.info("🐞Doing code review")
-            ai_comments = get_code_review(user_input, subtask, get_code_markdown(current_folder_name, file_name))
+            # Do a code-review for all files
+            for file_path in get_code_filepaths(current_folder_name):
+                ai_comments = get_code_review(user_input, subtask, summary, get_code_markdown_for_specific_file(file_path))
 
-            logging.info("Fixing code from AI comments")
-            filenames_and_codes = developer_fix_code_review(
-                user_input,
-                subtask,
-                ai_comments,
-                get_code_markdown(current_folder_name, file_name))
-            # Summarize the project
-            for filename, code in filenames_and_codes:
-                summary = developer_summarize_file(filename, code)
-                project_summary.add_file_summary(filename, summary)
-            persist_file_names_and_code(current_folder_name, filenames_and_codes)
+                logging.info("Fixing code from AI comments")
+                filenames_and_codes = developer_fix_code_review(
+                    user_input,
+                    subtask,
+                    ai_comments,
+                    get_code_markdown_for_specific_file(file_path))
+                # Summarize the project
+                for filename, code in filenames_and_codes:
+                    summary = developer_summarize_file(filename, code)
+                    project_summary.add_file_summary(filename, summary)
+                persist_file_names_and_code(current_folder_name, filenames_and_codes)
 
             # Place images in the code
             # image_data = generate_images(
